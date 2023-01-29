@@ -12,6 +12,7 @@ const TAG_NAME: &str = "name";
 const TAG_NUM_PLAYS: &str = "numplays";
 const TAG_STATUS: &str = "status";
 
+const ATTR_OBJECT_ID: &str = "objectid";
 const ATTR_OWN: &str = "own";
 
 fn node<'a>(n: &'a Node, name: &str) -> Option<Node<'a, 'a>> {
@@ -36,6 +37,7 @@ fn item_status(n: &Node, attr: &str) -> bool {
 
 #[derive(Debug)]
 pub struct Game {
+    id: u32,
     pub name: String,
     pub plays: u32,
 }
@@ -44,9 +46,16 @@ impl TryFrom<Node<'_, '_>> for Game {
     type Error = &'static str;
 
     fn try_from(n: Node<'_, '_>) -> Result<Self, Self::Error> {
+        let id = n
+            .attribute(ATTR_OBJECT_ID)
+            .map(|v| v.parse::<u32>())
+            .map(Result::ok)
+            .flatten()
+            .unwrap_or(0);
         match node_text(&n, TAG_NAME) {
             None => Err("name missing"),
             Some(name) => Ok(Game {
+                id,
                 name: name.to_string(),
                 plays: node_text(&n, TAG_NUM_PLAYS)
                     .map(|v| v.parse::<u32>())
