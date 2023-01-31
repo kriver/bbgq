@@ -8,9 +8,14 @@ use cli::Args;
 
 fn main() {
     let args = Args::parse();
-    let bgg = Bgg::new().with_user(&args.user);
-    match bgg.collection(true) {
+    let bgg = Bgg::new();
+    match bgg.collection(&args.user, true) {
         Err(msg) => println!("ERR - {}", msg),
-        Ok(games) => println!("{:#?}", games),
+        Ok(games) => {
+            for mut g in games {
+                bgg.fill_details(&mut g);
+                println!("{:?}", g);
+            }
+        }
     }
 }
