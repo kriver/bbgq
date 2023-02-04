@@ -206,26 +206,35 @@ impl Bgg {
         }
     }
 
-    pub fn fill_details(&self, game: &mut Game) -> Result<(), &'static str> {
-        let id = game.id.to_string();
-        let params = HashMap::from([(PARAM_ID, id.as_ref()), (PARAM_STATS, "1")]);
+    pub fn detail(&self, id: &u32) -> Result<Details, &'static str> {
+        let id_str = id.to_string();
+        let params = HashMap::from([(PARAM_ID, id_str.as_ref()), (PARAM_STATS, "1")]);
         match self.request(PATH_THING, params) {
             Err(e) => Err(e),
             Ok(body) => match Document::parse(&body) {
                 Err(_) => Err("failed to parse XML"),
-                Ok(xml) => {
-                    game.details = xml
-                        .root_element()
-                        .children()
-                        .into_iter()
-                        .filter(Node::is_element)
-                        .map(TryFrom::try_from)
-                        .filter(Result::is_ok)
-                        .map(Result::unwrap)
-                        .nth(0);
-                    Ok(())
-                }
+                Ok(xml) => xml
+                    .root_element()
+                    .children()
+                    .into_iter()
+                    .filter(Node::is_element)
+                    .map(TryFrom::try_from)
+                    .filter(Result::is_ok)
+                    .map(Result::unwrap)
+                    .nth(0)
+                    .ok_or("no details"),
             },
+        }
+    }
+
+    pub fn fill_details(&self, game: &mut Game) -> Result<(), &'static str> {
+        let id = game.id;
+        match self.detail(&id) {
+            Err(e) => Err(e),
+            Ok(details) => {
+                game.details = Some(details);
+                Ok(())
+            }
         }
     }
 }
