@@ -1,8 +1,10 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, fmt::Display, str::FromStr};
 
-use reqwest::blocking::get;
+use reqwest::blocking::Client;
 use roxmltree::{Document, Node};
 use url::Url;
+
+use crate::error::Error;
 
 const BGG: &str = "https://boardgamegeek.com/xmlapi2";
 
@@ -30,12 +32,18 @@ const ATTR_OWN: &str = "own";
 const ATTR_TYPE: &str = "type";
 const ATTR_VALUE: &str = "value";
 
-fn attribute<T: Default + FromStr>(n: &Node, name: &str) -> T {
-    n.attribute(name)
-        .map(|v| v.parse::<T>())
-        .map(Result::ok)
-        .flatten()
-        .unwrap_or_default()
+const VALUE_NOT_RANKED: &str = "Not Ranked";
+
+fn attribute<T: Default + FromStr>(n: &Node, name: &str) -> Result<T, Error>
+where
+    <T as FromStr>::Err: Display,
+{
+    match n.attribute(name) {
+        None => Err("attribute missing".into()),
+        Some(v) => v
+            .parse::<T>()
+            .map_err(|e| Error::Message(format!("{} (value '{}')", e, v))),
+    }
 }
 
 fn has_attribute(n: &Node, key: &str, value: &str) -> bool {
@@ -45,35 +53,35 @@ fn has_attribute(n: &Node, key: &str, value: &str) -> bool {
     }
 }
 
-fn node<'a>(n: &'a Node, name: &str) -> Option<Node<'a, 'a>> {
+fn node<'a>(n: &'a Node, name: &str) -> Result<Node<'a, 'a>, Error> {
     for child in n.children() {
         if child.is_element() && child.tag_name().name() == name {
-            return Some(child);
+            return Ok(child);
         }
     }
-    None
+    Err(format!("node '{}' not found", name).into())
 }
 
-fn node_with_attr<'a>(n: &'a Node, name: &str, key: &str, value: &str) -> Option<Node<'a, 'a>> {
+fn node_with_attr<'a>(
+    n: &'a Node,
+    name: &str,
+    key: &str,
+    value: &str,
+) -> Result<Node<'a, 'a>, Error> {
     for child in n.children() {
         if child.is_element() && child.tag_name().name() == name {
             if has_attribute(&child, key, value) {
-                return Some(child);
+                return Ok(child);
             }
         }
     }
-    None
+    Err(format!("node '{}' not found", name).into())
 }
 
-fn node_text<'a>(n: &'a Node, name: &str) -> Option<&'a str> {
-    node(n, name).map(|n| n.text()).flatten()
-}
-
-fn item_status(n: &Node, attr: &str) -> bool {
-    match node(n, TAG_STATUS) {
-        Some(status) => status.attribute(attr).map(|b| b == "1").unwrap_or(false),
-        None => false,
-    }
+fn node_text<'a>(n: &'a Node, name: &str) -> Result<&'a str, Error> {
+    node(n, name)?
+        .text()
+        .ok_or(format!("missing text for node '{}'", name).into())
 }
 
 #[derive(Debug)]
@@ -85,69 +93,58 @@ pub struct Game {
 }
 
 impl TryFrom<Node<'_, '_>> for Game {
-    type Error = &'static str;
+    type Error = Error;
 
     fn try_from(n: Node<'_, '_>) -> Result<Self, Self::Error> {
-        let id = attribute(&n, ATTR_OBJECT_ID);
-        match node_text(&n, TAG_NAME) {
-            None => Err("name missing"),
-            Some(name) => Ok(Game {
-                id,
-                name: name.to_string(),
-                plays: node_text(&n, TAG_NUM_PLAYS)
-                    .map(|v| v.parse::<u32>())
-                    .map(Result::ok)
-                    .flatten()
-                    .unwrap_or(0),
-                details: None,
-            }),
-        }
+        let id = attribute(&n, ATTR_OBJECT_ID)?;
+        let name = node_text(&n, TAG_NAME)?;
+        let np = node_text(&n, TAG_NUM_PLAYS)?.parse::<u32>()?;
+        Ok(Game {
+            id,
+            name: name.to_string(),
+            plays: np,
+            details: None,
+        })
     }
 }
 
 #[derive(Debug)]
 pub struct Details {
     pub rating: f32,
-    pub rank: u32,
+    pub rank: Option<u32>,
     pub categories: Vec<String>,
     pub mechanics: Vec<String>,
 }
 
 impl TryFrom<Node<'_, '_>> for Details {
-    type Error = &'static str;
+    type Error = Error;
 
     fn try_from(n: Node<'_, '_>) -> Result<Self, Self::Error> {
-        fn ratings(n: &Node) -> (f32, u32) {
-            let (mut rating, mut rank) = (0.0, 0);
-            if let Some(a) = node(&n, TAG_AVERAGE) {
-                rating = attribute(&a, ATTR_VALUE)
-            }
-            if let Some(r) = node(n, TAG_RANKS) {
-                if let Some(r1) = node_with_attr(&r, TAG_RANK, ATTR_NAME, "boardgame") {
-                    rank = attribute(&r1, ATTR_VALUE)
-                }
-            }
-            (rating, rank)
+        fn ratings(n: &Node) -> Result<(f32, Option<u32>), Error> {
+            let rank = match attribute::<String>(
+                &node_with_attr(&node(n, TAG_RANKS)?, TAG_RANK, ATTR_NAME, "boardgame")?,
+                ATTR_VALUE,
+            ) {
+                Err(e) => Err(e),
+                Ok(r) if r == VALUE_NOT_RANKED => Ok(None),
+                Ok(r) => Ok(Some(r.parse()?)),
+            }?;
+            Ok((attribute(&node(&n, TAG_AVERAGE)?, ATTR_VALUE)?, rank))
         }
 
-        let (mut rating, mut rank) = (0.0, 0);
-        if let Some(s) = node(&n, TAG_STATISTICS) {
-            if let Some(r) = node(&s, TAG_RATINGS) {
-                (rating, rank) = ratings(&r);
-            }
-        };
+        let (rating, rank) = ratings(&node(&node(&n, TAG_STATISTICS)?, TAG_RATINGS)?)?;
         let categories = n
             .children()
             .filter(|c| c.tag_name().name() == TAG_LINK)
             .filter(|c| has_attribute(&c, ATTR_TYPE, "boardgamecategory"))
             .map(|c| attribute(&c, ATTR_VALUE))
-            .collect();
+            .collect::<Result<Vec<String>, Error>>()?;
         let mechanics = n
             .children()
             .filter(|c| c.tag_name().name() == TAG_LINK)
             .filter(|c| has_attribute(&c, ATTR_TYPE, "boardgamemechanic"))
             .map(|c| attribute(&c, ATTR_VALUE))
-            .collect();
+            .collect::<Result<Vec<String>, Error>>()?;
         Ok(Details {
             rating,
             rank,
@@ -158,83 +155,78 @@ impl TryFrom<Node<'_, '_>> for Details {
 }
 
 pub struct Bgg {
+    client: Client,
     url: Url,
 }
 
 impl Bgg {
     pub fn new() -> Self {
         Bgg {
+            client: Client::new(),
             url: Url::parse(BGG).unwrap(),
         }
     }
 
-    fn request(&self, path: &str, params: HashMap<&str, &str>) -> Result<String, &'static str> {
+    fn request(&self, path: &str, params: HashMap<&str, &str>) -> Result<String, Error> {
         let mut url = self.url.clone();
         for (k, v) in params.into_iter() {
             url.query_pairs_mut().append_pair(k, v);
             url.path_segments_mut().unwrap().push(path);
         }
-        match get(url.as_str()) {
-            Err(_) => Err("failed to get data"),
-            Ok(res) => match res.text() {
-                Err(_) => Err("failed to read body"),
-                Ok(body) => Ok(body),
-            },
+        let res = self.client.get(url.as_str()).send()?;
+        match res.status().is_success() {
+            true => Ok(res.text()?),
+            false => Err(format!("HTTP {}", res.status()).into()),
         }
     }
 
-    pub fn collection(&self, user: &str, only_owned: bool) -> Result<Vec<Game>, &'static str> {
+    pub fn collection(&self, user: &str, only_owned: bool) -> Result<Vec<Game>, Error> {
+        fn item_status(n: &Node, attr: &str) -> bool {
+            match node(n, TAG_STATUS) {
+                Ok(status) => status.attribute(attr).map(|b| b == "1").unwrap_or(false),
+                Err(_) => false,
+            }
+        }
+
         let params = HashMap::from([
             (PARAM_USER_NAME, user),
             (PARAM_EXCL_SUBTYPE, "boardgameexpansion"),
         ]);
-        match self.request(PATH_COLLECTION, params) {
-            Err(e) => Err(e),
-            Ok(body) => match Document::parse(&body) {
-                Err(_) => Err("failed to parse XML"),
-                Ok(xml) => Ok(xml
-                    .root_element()
-                    .children()
-                    .into_iter()
-                    .filter(Node::is_element)
-                    .filter(|n| item_status(n, ATTR_OWN) == only_owned)
-                    .map(TryFrom::try_from)
-                    .filter(Result::is_ok)
-                    .map(Result::unwrap)
-                    .collect()),
-            },
-        }
+        let body = self.request(PATH_COLLECTION, params)?;
+        let xml = Document::parse(&body)?;
+        Ok(xml
+            .root_element()
+            .children()
+            .into_iter()
+            .filter(Node::is_element)
+            .filter(|n| item_status(n, ATTR_OWN) == only_owned)
+            .map(TryFrom::try_from)
+            .filter(Result::is_ok)
+            .map(Result::unwrap)
+            .collect())
     }
 
-    pub fn detail(&self, id: &u32) -> Result<Details, &'static str> {
+    pub fn detail(&self, id: &u32) -> Result<Details, Error> {
         let id_str = id.to_string();
+        // FIXME implement rate limiting on 429?
+        // See https://boardgamegeek.com/thread/2388502/updated-api-rate-limit-recommendation
+        // FIXME support multiple IDs in single request (comma-separated)
         let params = HashMap::from([(PARAM_ID, id_str.as_ref()), (PARAM_STATS, "1")]);
-        match self.request(PATH_THING, params) {
-            Err(e) => Err(e),
-            Ok(body) => match Document::parse(&body) {
-                Err(_) => Err("failed to parse XML"),
-                Ok(xml) => xml
-                    .root_element()
-                    .children()
-                    .into_iter()
-                    .filter(Node::is_element)
-                    .map(TryFrom::try_from)
-                    .filter(Result::is_ok)
-                    .map(Result::unwrap)
-                    .nth(0)
-                    .ok_or("no details"),
-            },
-        }
+        let body = self.request(PATH_THING, params)?;
+        let xml = Document::parse(&body)?;
+        let detail = xml
+            .root_element()
+            .children()
+            .into_iter()
+            .filter(Node::is_element)
+            .nth(0)
+            .ok_or::<Error>(format!("no detail for id {}", id).into())?;
+        detail.try_into()
     }
 
-    pub fn fill_details(&self, game: &mut Game) -> Result<(), &'static str> {
+    pub fn fill_details(&self, game: &mut Game) -> Result<(), Error> {
         let id = game.id;
-        match self.detail(&id) {
-            Err(e) => Err(e),
-            Ok(details) => {
-                game.details = Some(details);
-                Ok(())
-            }
-        }
+        game.details = Some(self.detail(&id)?);
+        Ok(())
     }
 }

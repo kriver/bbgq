@@ -3,11 +3,13 @@ use clap::Parser;
 
 mod bgg_api;
 mod cli;
+mod error;
 
 use cli::{Cli, Commands};
+use error::Error;
 
-fn print_err(msg: &str) {
-    println!("ERR - {}", msg);
+fn print_err(e: Error) {
+    println!("{}", e);
 }
 
 fn main() {
@@ -15,18 +17,21 @@ fn main() {
     let bgg = Bgg::new();
     match &cli.command {
         Commands::Collection { user } => match bgg.collection(user, true) {
-            Err(msg) => print_err(msg),
+            Err(e) => print_err(e),
             Ok(games) => {
                 for mut g in games {
                     match bgg.fill_details(&mut g) {
-                        Err(msg) => println!("ERR - {}", msg),
+                        Err(e) => {
+                            print_err(e);
+                            break;
+                        }
                         Ok(_) => println!("{:?}", g),
                     }
                 }
             }
         },
         Commands::Detail { id } => match bgg.detail(id) {
-            Err(msg) => print_err(msg),
+            Err(e) => print_err(e),
             Ok(detail) => println!("{:?}", detail),
         },
     }
