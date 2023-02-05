@@ -11,7 +11,6 @@ Functionalities:
 
 # Possible future improvements
 
-* sort collection by name, rating, rank, ...
 * filter collection by category, mechanic
 * list categories and/or mechanics in collection
 * Throttling to avoid 429 (too many requests)
