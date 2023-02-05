@@ -176,8 +176,6 @@ impl Bgg {
         }
     }
 
-    // TODO implement rate limiting on 429?
-    // See https://boardgamegeek.com/thread/2388502/updated-api-rate-limit-recommendation
     fn request(&self, path: &str, params: HashMap<&str, &str>) -> Result<String, Error> {
         let mut url = self.url.clone();
         for (k, v) in params.into_iter() {
