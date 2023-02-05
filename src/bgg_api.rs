@@ -42,7 +42,7 @@ where
     <T as FromStr>::Err: Display,
 {
     match n.attribute(name) {
-        None => Err("attribute missing".into()),
+        None => Err(format!("attribute {} not found", name).into()),
         Some(v) => v
             .parse::<T>()
             .map_err(|e| Error::Message(format!("{} (value '{}')", e, v))),
@@ -129,11 +129,10 @@ impl TryFrom<Node<'_, '_>> for Details {
             let rank = match attribute::<String>(
                 &node_with_attr(&node(n, TAG_RANKS)?, TAG_RANK, ATTR_NAME, "boardgame")?,
                 ATTR_VALUE,
-            ) {
-                Err(e) => Err(e),
-                Ok(r) if r == VALUE_NOT_RANKED => Ok(None),
-                Ok(r) => Ok(Some(r.parse()?)),
-            }?;
+            )? {
+                r if r == VALUE_NOT_RANKED => None,
+                r => Some(r.parse()?),
+            };
             Ok((attribute(&node(&n, TAG_AVERAGE)?, ATTR_VALUE)?, rank))
         }
 
