@@ -3,7 +3,11 @@ use clap::Parser;
 
 mod bgg_api;
 mod cli;
+mod constants;
+mod details;
 mod error;
+mod game;
+mod xml_util;
 
 use cli::{Cli, Commands};
 use error::Error;
