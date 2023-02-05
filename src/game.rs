@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter};
+
 use roxmltree::Node;
 
 use crate::{constants::*, details::Details, error::Error, xml_util::*};
@@ -23,5 +25,11 @@ impl TryFrom<Node<'_, '_>> for Game {
             plays: np,
             details: None,
         })
+    }
+}
+
+impl Display for Game {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.details.as_ref().unwrap())
     }
 }

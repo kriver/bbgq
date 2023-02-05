@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter};
+
 use roxmltree::Node;
 
 use crate::{constants::*, error::Error, xml_util::*};
@@ -50,5 +52,15 @@ impl TryFrom<Node<'_, '_>> for Details {
             categories,
             mechanics,
         })
+    }
+}
+
+impl Display for Details {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: rated {}", self.name, self.rating)?;
+        if let Some(r) = self.rank {
+            write!(f, " (ranked {})", r)?;
+        }
+        Ok(())
     }
 }

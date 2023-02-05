@@ -26,14 +26,14 @@ fn main() {
                 Err(e) => print_err(e),
                 Ok(_) => {
                     for g in games {
-                        println!("{:?}", g)
+                        println!("{}", g)
                     }
                 }
             },
         },
         Commands::Detail { id } => match bgg.detail(*id) {
             Err(e) => print_err(e),
-            Ok(detail) => println!("{:?}", detail),
+            Ok(detail) => println!("{}", detail),
         },
     }
 }
