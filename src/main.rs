@@ -18,19 +18,16 @@ fn main() {
     match &cli.command {
         Commands::Collection { user } => match bgg.collection(user, true) {
             Err(e) => print_err(e),
-            Ok(games) => {
-                for mut g in games {
-                    match bgg.fill_details(&mut g) {
-                        Err(e) => {
-                            print_err(e);
-                            break;
-                        }
-                        Ok(_) => println!("{:?}", g),
+            Ok(mut games) => match bgg.fill_details(&mut games) {
+                Err(e) => print_err(e),
+                Ok(_) => {
+                    for g in games {
+                        println!("{:?}", g)
                     }
                 }
-            }
+            },
         },
-        Commands::Detail { id } => match bgg.detail(id) {
+        Commands::Detail { id } => match bgg.detail(*id) {
             Err(e) => print_err(e),
             Ok(detail) => println!("{:?}", detail),
         },

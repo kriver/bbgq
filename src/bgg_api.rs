@@ -6,6 +6,8 @@ use url::Url;
 
 use crate::error::Error;
 
+const CHUNK_SIZE: usize = 100;
+
 const BGG: &str = "https://boardgamegeek.com/xmlapi2";
 
 const PARAM_EXCL_SUBTYPE: &str = "excludesubtype";
@@ -26,6 +28,7 @@ const TAG_RATINGS: &str = "ratings";
 const TAG_STATISTICS: &str = "statistics";
 const TAG_STATUS: &str = "status";
 
+const ATTR_ID: &str = "id";
 const ATTR_NAME: &str = "name";
 const ATTR_OBJECT_ID: &str = "objectid";
 const ATTR_OWN: &str = "own";
@@ -110,6 +113,8 @@ impl TryFrom<Node<'_, '_>> for Game {
 
 #[derive(Debug)]
 pub struct Details {
+    id: u32,
+    pub name: String,
     pub rating: f32,
     pub rank: Option<u32>,
     pub categories: Vec<String>,
@@ -132,6 +137,8 @@ impl TryFrom<Node<'_, '_>> for Details {
             Ok((attribute(&node(&n, TAG_AVERAGE)?, ATTR_VALUE)?, rank))
         }
 
+        let id = attribute(&n, ATTR_ID)?;
+        let name = attribute(&node(&n, TAG_NAME)?, ATTR_VALUE)?;
         let (rating, rank) = ratings(&node(&node(&n, TAG_STATISTICS)?, TAG_RATINGS)?)?;
         let categories = n
             .children()
@@ -146,6 +153,8 @@ impl TryFrom<Node<'_, '_>> for Details {
             .map(|c| attribute(&c, ATTR_VALUE))
             .collect::<Result<Vec<String>, Error>>()?;
         Ok(Details {
+            id,
+            name,
             rating,
             rank,
             categories,
@@ -167,6 +176,8 @@ impl Bgg {
         }
     }
 
+    // TODO implement rate limiting on 429?
+    // See https://boardgamegeek.com/thread/2388502/updated-api-rate-limit-recommendation
     fn request(&self, path: &str, params: HashMap<&str, &str>) -> Result<String, Error> {
         let mut url = self.url.clone();
         for (k, v) in params.into_iter() {
@@ -194,39 +205,47 @@ impl Bgg {
         ]);
         let body = self.request(PATH_COLLECTION, params)?;
         let xml = Document::parse(&body)?;
-        Ok(xml
-            .root_element()
+        xml.root_element()
             .children()
             .into_iter()
             .filter(Node::is_element)
             .filter(|n| item_status(n, ATTR_OWN) == only_owned)
             .map(TryFrom::try_from)
-            .filter(Result::is_ok)
-            .map(Result::unwrap)
-            .collect())
+            .collect()
     }
 
-    pub fn detail(&self, id: &u32) -> Result<Details, Error> {
-        let id_str = id.to_string();
-        // FIXME implement rate limiting on 429?
-        // See https://boardgamegeek.com/thread/2388502/updated-api-rate-limit-recommendation
-        // FIXME support multiple IDs in single request (comma-separated)
-        let params = HashMap::from([(PARAM_ID, id_str.as_ref()), (PARAM_STATS, "1")]);
+    fn details(&self, ids: &[u32]) -> Result<Vec<Details>, Error> {
+        let id_val = ids
+            .iter()
+            .map(|i| i.to_string())
+            .collect::<Vec<String>>()
+            .join(",");
+        let params = HashMap::from([(PARAM_ID, id_val.as_ref()), (PARAM_STATS, "1")]);
         let body = self.request(PATH_THING, params)?;
         let xml = Document::parse(&body)?;
-        let detail = xml
-            .root_element()
+        xml.root_element()
             .children()
             .into_iter()
             .filter(Node::is_element)
-            .nth(0)
-            .ok_or::<Error>(format!("no detail for id {}", id).into())?;
-        detail.try_into()
+            .map(TryFrom::try_from)
+            .collect()
     }
 
-    pub fn fill_details(&self, game: &mut Game) -> Result<(), Error> {
-        let id = game.id;
-        game.details = Some(self.detail(&id)?);
+    pub fn detail(&self, id: u32) -> Result<Details, Error> {
+        self.details(&[id]).map(|mut details| details.remove(0))
+    }
+
+    pub fn fill_details(&self, games: &mut [Game]) -> Result<(), Error> {
+        let ids: Vec<u32> = games.iter().map(|g| g.id).collect();
+        let mut details = HashMap::new();
+        for chunk in ids.chunks(CHUNK_SIZE) {
+            for d in self.details(chunk)?.into_iter() {
+                details.insert(d.id, d);
+            }
+        }
+        for g in games.iter_mut() {
+            g.details = details.remove(&g.id);
+        }
         Ok(())
     }
 }
