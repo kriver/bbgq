@@ -2,7 +2,7 @@ use std::{fmt::Display, str::FromStr};
 
 use roxmltree::Node;
 
-use crate::error::Error;
+use crate::{constants::*, error::Error};
 
 pub fn attribute<T: Default + FromStr>(n: &Node, name: &str) -> Result<T, Error>
 where
@@ -52,4 +52,25 @@ pub fn node_text<'a>(n: &'a Node, name: &str) -> Result<&'a str, Error> {
     node(n, name)?
         .text()
         .ok_or(format!("missing text for node '{}'", name).into())
+}
+
+pub fn get_id(n: &Node) -> Result<u32, Error> {
+    match attribute(n, ATTR_OBJECT_ID) {
+        Ok(id) => Ok(id),
+        Err(_) => attribute(n, ATTR_ID),
+    }
+}
+
+pub fn get_name(n: &Node) -> Result<String, Error> {
+    match node_text(&n, TAG_NAME) {
+        Ok(name) => Ok(name.to_string()),
+        Err(_) => attribute(&node(&n, TAG_NAME)?, ATTR_VALUE),
+    }
+}
+
+pub fn get_num_plays(n: &Node) -> Result<u32, Error> {
+    match node_text(&n, TAG_NUM_PLAYS) {
+        Ok(np) => Ok(np.parse::<u32>()?),
+        Err(_) => Ok(0),
+    }
 }

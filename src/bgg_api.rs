@@ -4,7 +4,7 @@ use reqwest::blocking::Client;
 use roxmltree::{Document, Node};
 use url::Url;
 
-use crate::{constants::*, details::Details, error::Error, game::Game, xml_util::node};
+use crate::{constants::*, error::Error, game::Game, xml_util::node};
 
 const CHUNK_SIZE: usize = 100;
 
@@ -59,7 +59,7 @@ impl Bgg {
             .collect()
     }
 
-    fn details(&self, ids: &[u32]) -> Result<Vec<Details>, Error> {
+    fn details(&self, ids: &[u32]) -> Result<Vec<Game>, Error> {
         let id_val = ids
             .iter()
             .map(|i| i.to_string())
@@ -72,11 +72,15 @@ impl Bgg {
             .children()
             .into_iter()
             .filter(Node::is_element)
-            .map(TryFrom::try_from)
+            .map(|n| {
+                let mut game: Game = n.try_into()?;
+                game.details = Some(n.try_into()?);
+                Ok(game)
+            })
             .collect()
     }
 
-    pub fn detail(&self, id: u32) -> Result<Details, Error> {
+    pub fn detail(&self, id: u32) -> Result<Game, Error> {
         self.details(&[id]).map(|mut details| details.remove(0))
     }
 
@@ -84,8 +88,8 @@ impl Bgg {
         let ids: Vec<u32> = games.iter().map(|g| g.id).collect();
         let mut details = HashMap::new();
         for chunk in ids.chunks(CHUNK_SIZE) {
-            for d in self.details(chunk)?.into_iter() {
-                details.insert(d.id, d);
+            for g in self.details(chunk)?.into_iter() {
+                details.insert(g.id, g.details.unwrap());
             }
         }
         for g in games.iter_mut() {

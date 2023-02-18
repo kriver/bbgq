@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 
 use roxmltree::Node;
 
-use crate::{constants::*, details::Details, error::Error, xml_util::*};
+use crate::{details::Details, error::Error, xml_util::*};
 
 #[derive(Debug)]
 pub struct Game {
@@ -10,27 +10,6 @@ pub struct Game {
     pub name: String,
     pub plays: u32,
     pub details: Option<Details>,
-}
-
-fn get_id(n: &Node) -> Result<u32, Error> {
-    match attribute(n, ATTR_OBJECT_ID) {
-        Ok(id) => Ok(id),
-        Err(_) => attribute(n, ATTR_ID),
-    }
-}
-
-fn get_name(n: &Node) -> Result<String, Error> {
-    match node_text(&n, TAG_NAME) {
-        Ok(name) => Ok(name.to_string()),
-        Err(_) => attribute(&node(&n, TAG_NAME)?, ATTR_VALUE),
-    }
-}
-
-fn get_num_plays(n: &Node) -> Result<u32, Error> {
-    match node_text(&n, TAG_NUM_PLAYS) {
-        Ok(np) => Ok(np.parse::<u32>()?),
-        Err(_) => Ok(0),
-    }
 }
 
 impl TryFrom<Node<'_, '_>> for Game {
@@ -51,9 +30,10 @@ impl TryFrom<Node<'_, '_>> for Game {
 
 impl Display for Game {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.details.as_ref() {
-            None => write!(f, "{}", self.name),
-            Some(d) => write!(f, "{}", d),
+        write!(f, "{}: id={}, plays={}", self.name, self.id, self.plays)?;
+        if let Some(d) = self.details.as_ref() {
+            write!(f, ", {}", d)?;
         }
+        Ok(())
     }
 }

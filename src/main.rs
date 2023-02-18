@@ -81,7 +81,7 @@ fn main() {
         },
         Commands::Detail { id } => match bgg.detail(*id) {
             Err(e) => print_err(e),
-            Ok(detail) => println!("{}", detail),
+            Ok(game) => println!("{}", game),
         },
         Commands::Search { name } => match bgg.search(name) {
             Err(e) => print_err(e),

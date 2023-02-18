@@ -6,8 +6,6 @@ use crate::{constants::*, error::Error, xml_util::*};
 
 #[derive(Debug)]
 pub struct Details {
-    pub id: u32,
-    pub name: String,
     pub rating: f32,
     pub rank: Option<u32>,
     pub categories: Vec<String>,
@@ -29,8 +27,6 @@ impl TryFrom<Node<'_, '_>> for Details {
             Ok((attribute(&node(&n, TAG_AVERAGE)?, ATTR_VALUE)?, rank))
         }
 
-        let id = attribute(&n, ATTR_ID)?;
-        let name = attribute(&node(&n, TAG_NAME)?, ATTR_VALUE)?;
         let (rating, rank) = ratings(&node(&node(&n, TAG_STATISTICS)?, TAG_RATINGS)?)?;
         let categories = n
             .children()
@@ -45,8 +41,6 @@ impl TryFrom<Node<'_, '_>> for Details {
             .map(|c| attribute(&c, ATTR_VALUE))
             .collect::<Result<Vec<String>, Error>>()?;
         Ok(Details {
-            id,
-            name,
             rating,
             rank,
             categories,
@@ -57,9 +51,9 @@ impl TryFrom<Node<'_, '_>> for Details {
 
 impl Display for Details {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: rated {}", self.name, self.rating)?;
+        write!(f, "rating={}", self.rating)?;
         if let Some(r) = self.rank {
-            write!(f, " (ranked {})", r)?;
+            write!(f, ", rank={}", r)?;
         }
         Ok(())
     }
