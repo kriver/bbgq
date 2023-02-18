@@ -9,7 +9,6 @@ mod constants;
 mod details;
 mod error;
 mod game;
-mod search_result;
 mod xml_util;
 
 use cli::*;
@@ -86,11 +85,7 @@ fn main() {
         },
         Commands::Search { name } => match bgg.search(name) {
             Err(e) => print_err(e),
-            Ok(results) => {
-                for r in results {
-                    println!("{}", r);
-                }
-            }
+            Ok(results) => list_collection(results, &None),
         },
     }
 }

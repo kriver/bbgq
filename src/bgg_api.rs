@@ -4,10 +4,7 @@ use reqwest::blocking::Client;
 use roxmltree::{Document, Node};
 use url::Url;
 
-use crate::{
-    constants::*, details::Details, error::Error, game::Game, search_result::SearchResult,
-    xml_util::node,
-};
+use crate::{constants::*, details::Details, error::Error, game::Game, xml_util::node};
 
 const CHUNK_SIZE: usize = 100;
 
@@ -97,7 +94,7 @@ impl Bgg {
         Ok(())
     }
 
-    pub fn search(&self, name: &str) -> Result<Vec<SearchResult>, Error> {
+    pub fn search(&self, name: &str) -> Result<Vec<Game>, Error> {
         let params = HashMap::from([(PARAM_QUERY, name), (PARAM_TYPE, "boardgame")]);
         let body = self.request(PATH_SEARCH, params)?;
         let xml = Document::parse(&body)?;
