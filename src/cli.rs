@@ -16,6 +16,9 @@ pub enum Commands {
     Detail {
         id: u32,
     },
+    Search {
+        name: String,
+    }
 }
 
 #[derive(Clone, ValueEnum)]

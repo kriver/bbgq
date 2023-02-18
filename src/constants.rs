@@ -1,9 +1,12 @@
 pub const PARAM_EXCL_SUBTYPE: &str = "excludesubtype";
 pub const PARAM_ID: &str = "id";
+pub const PARAM_QUERY: &str = "query";
 pub const PARAM_STATS: &str = "stats";
+pub const PARAM_TYPE: &str = "type";
 pub const PARAM_USER_NAME: &str = "username";
 
 pub const PATH_COLLECTION: &str = "collection";
+pub const PATH_SEARCH: &str = "search";
 pub const PATH_THING: &str = "thing";
 
 pub const TAG_AVERAGE: &str = "average";

@@ -9,6 +9,7 @@ mod constants;
 mod details;
 mod error;
 mod game;
+mod search_result;
 mod xml_util;
 
 use cli::*;
@@ -82,6 +83,14 @@ fn main() {
         Commands::Detail { id } => match bgg.detail(*id) {
             Err(e) => print_err(e),
             Ok(detail) => println!("{}", detail),
+        },
+        Commands::Search { name } => match bgg.search(name) {
+            Err(e) => print_err(e),
+            Ok(results) => {
+                for r in results {
+                    println!("{}", r);
+                }
+            }
         },
     }
 }
