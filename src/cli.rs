@@ -11,10 +11,13 @@ pub enum Commands {
     Collection {
         /// BGG user name to retrieve collection for
         user: String,
-        /// Selects what data to output
+        /// Selects what data to output or filter on
         #[arg(value_enum, short, long, default_value_t=Data::Games)]
         data: Data,
-        /// When outputting games sort them by this criteria
+        /// Only output games that have matching "data"
+        #[arg(short, long)]
+        filter: Option<String>,
+        /// When outputting "games" sort them by this criteria
         #[arg(value_enum, short, long)]
         sort: Option<SortOrder>,
     },

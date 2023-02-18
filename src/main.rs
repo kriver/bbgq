@@ -16,6 +16,10 @@ use details::Details;
 use error::Error;
 use game::Game;
 
+type PropertyGetter = fn(Details) -> Vec<String>;
+type PropertyGetterRef = fn(&Details) -> &[String];
+type FilterType = Box<dyn FnMut(&Game) -> bool>;
+
 fn print_err(e: Error) {
     println!("{}", e);
 }
@@ -61,17 +65,35 @@ fn comparator(order: &SortOrder) -> impl FnMut(&Game, &Game) -> Ordering {
     }
 }
 
-fn list_games(mut games: Vec<Game>, sort_by: &Option<SortOrder>) {
+fn filter_for_property(getter: PropertyGetterRef, value: String) -> FilterType {
+    Box::new(move |g: &Game| match &g.details {
+        None => false,
+        Some(d) => getter(d).iter().any(|s| s.contains(&value)),
+    })
+}
+
+fn filter_for(data: Data, value: String) -> FilterType {
+    match data {
+        Data::Games => Box::new(move |g: &Game| g.name.contains(&value)),
+        Data::Mechanics => filter_for_property(|d| &d.mechanics, value),
+        Data::Categories => filter_for_property(|d| &d.categories, value),
+    }
+}
+
+fn list_games<F>(mut games: Vec<Game>, sort_by: &Option<SortOrder>, predicate: F)
+where
+    F: FnMut(&Game) -> bool,
+{
     if let Some(by) = sort_by {
         games.sort_by(comparator(by))
     }
-    for g in games {
+    for g in games.into_iter().filter(predicate) {
         println!("{}", g)
     }
 }
 
-fn list_properties(games: Vec<Game>, getter: fn(Details) -> Vec<String>) {
-    let mut mechanics: Vec<String> = games
+fn list_properties(games: Vec<Game>, getter: PropertyGetter) {
+    let mut properties: Vec<String> = games
         .into_iter()
         .map(|g| g.details)
         .filter(|d| d.is_some())
@@ -80,17 +102,25 @@ fn list_properties(games: Vec<Game>, getter: fn(Details) -> Vec<String>) {
         .collect::<HashSet<String>>() // remove duplicates
         .into_iter()
         .collect();
-    mechanics.sort();
-    for m in mechanics {
+    properties.sort();
+    for m in properties {
         println!("{}", m);
     }
 }
 
-fn list_collection(games: Vec<Game>, data: &Data, sort_by: &Option<SortOrder>) {
-    match data {
-        Data::Games => list_games(games, sort_by),
-        Data::Mechanics => list_properties(games, |d| d.mechanics),
-        Data::Categories => list_properties(games, |d| d.categories),
+fn list_collection(
+    games: Vec<Game>,
+    data: &Data,
+    filter: &Option<String>,
+    sort_by: &Option<SortOrder>,
+) {
+    match filter {
+        Some(f) => list_games(games, sort_by, filter_for(data.clone(), f.clone())),
+        None => match data {
+            Data::Games => list_games(games, sort_by, |_| true),
+            Data::Mechanics => list_properties(games, |d| d.mechanics),
+            Data::Categories => list_properties(games, |d| d.categories),
+        },
     }
 }
 
@@ -98,11 +128,16 @@ fn main() {
     let cli = Cli::parse();
     let bgg = Bgg::new();
     match &cli.command {
-        Commands::Collection { user, data, sort } => match bgg.collection(user, true) {
+        Commands::Collection {
+            user,
+            data,
+            filter,
+            sort,
+        } => match bgg.collection(user, true) {
             Err(e) => print_err(e),
             Ok(mut games) => match bgg.fill_details(&mut games) {
                 Err(e) => print_err(e),
-                Ok(_) => list_collection(games, data, sort),
+                Ok(_) => list_collection(games, data, filter, sort),
             },
         },
         Commands::Detail { id } => match bgg.detail(*id) {
@@ -111,7 +146,7 @@ fn main() {
         },
         Commands::Search { name } => match bgg.search(name) {
             Err(e) => print_err(e),
-            Ok(results) => list_games(results, &None),
+            Ok(results) => list_collection(results, &Data::Games, &None, &None),
         },
     }
 }
