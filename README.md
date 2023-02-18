@@ -12,5 +12,4 @@ Functionalities:
 # Possible future improvements
 
 * filter collection by category, mechanic
-* list categories and/or mechanics in collection
 * Throttling to avoid 429 (too many requests)

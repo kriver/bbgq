@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::HashSet};
 
 use bgg_api::Bgg;
 use clap::Parser;
@@ -12,6 +12,7 @@ mod game;
 mod xml_util;
 
 use cli::*;
+use details::Details;
 use error::Error;
 use game::Game;
 
@@ -60,7 +61,7 @@ fn comparator(order: &SortOrder) -> impl FnMut(&Game, &Game) -> Ordering {
     }
 }
 
-fn list_collection(mut games: Vec<Game>, sort_by: &Option<SortOrder>) {
+fn list_games(mut games: Vec<Game>, sort_by: &Option<SortOrder>) {
     if let Some(by) = sort_by {
         games.sort_by(comparator(by))
     }
@@ -68,15 +69,40 @@ fn list_collection(mut games: Vec<Game>, sort_by: &Option<SortOrder>) {
         println!("{}", g)
     }
 }
+
+fn list_properties(games: Vec<Game>, getter: fn(Details) -> Vec<String>) {
+    let mut mechanics: Vec<String> = games
+        .into_iter()
+        .map(|g| g.details)
+        .filter(|d| d.is_some())
+        .map(|d| d.unwrap())
+        .flat_map(getter)
+        .collect::<HashSet<String>>() // remove duplicates
+        .into_iter()
+        .collect();
+    mechanics.sort();
+    for m in mechanics {
+        println!("{}", m);
+    }
+}
+
+fn list_collection(games: Vec<Game>, data: &Data, sort_by: &Option<SortOrder>) {
+    match data {
+        Data::Games => list_games(games, sort_by),
+        Data::Mechanics => list_properties(games, |d| d.mechanics),
+        Data::Categories => list_properties(games, |d| d.categories),
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
     let bgg = Bgg::new();
     match &cli.command {
-        Commands::Collection { user, sort } => match bgg.collection(user, true) {
+        Commands::Collection { user, data, sort } => match bgg.collection(user, true) {
             Err(e) => print_err(e),
             Ok(mut games) => match bgg.fill_details(&mut games) {
                 Err(e) => print_err(e),
-                Ok(_) => list_collection(games, sort),
+                Ok(_) => list_collection(games, data, sort),
             },
         },
         Commands::Detail { id } => match bgg.detail(*id) {
@@ -85,7 +111,7 @@ fn main() {
         },
         Commands::Search { name } => match bgg.search(name) {
             Err(e) => print_err(e),
-            Ok(results) => list_collection(results, &None),
+            Ok(results) => list_games(results, &None),
         },
     }
 }
