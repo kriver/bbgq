@@ -5,6 +5,16 @@ pub struct Cli {
     /// Display extra information when outputting game details.
     #[arg(short, long)]
     pub verbose: bool,
+    /// Selects what data to output or filter on
+    #[arg(value_enum, short, long, default_value_t=Data::Games)]
+    pub data: Data,
+    /// Only output games that have matching "data"
+    #[arg(short, long)]
+    pub filter: Option<String>,
+    /// When outputting "games" sort them by this criteria
+    #[arg(value_enum, short, long)]
+    pub sort: Option<SortOrder>,
+    /// What games to start from
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -40,15 +50,6 @@ pub enum Data {
 pub struct CollectionCommand {
     /// BGG user name to retrieve collection for
     pub user: String,
-    /// Selects what data to output or filter on
-    #[arg(value_enum, short, long, default_value_t=Data::Games)]
-    pub data: Data,
-    /// Only output games that have matching "data"
-    #[arg(short, long)]
-    pub filter: Option<String>,
-    /// When outputting "games" sort them by this criteria
-    #[arg(value_enum, short, long)]
-    pub sort: Option<SortOrder>,
 }
 
 #[derive(Parser)]

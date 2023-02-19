@@ -122,20 +122,18 @@ fn print_properties(games: Vec<Game>, getter: PropertyGetter) {
     }
 }
 
-fn print_list(
-    bgg: &Bgg,
-    games: Result<Vec<Game>, Error>,
-    data: &Data,
-    verbose: bool,
-    filter: &Option<String>,
-    sort_by: &Option<SortOrder>,
-) {
+fn print_list(cli: &Cli, bgg: &Bgg, games: Result<Vec<Game>, Error>) {
     match games.and_then(|g| bgg.fill_details(g)) {
         Err(e) => print_err(e),
-        Ok(g) => match filter {
-            Some(f) => print_games(g, sort_by, filter_for(data.clone(), f.clone()), verbose),
-            None => match data {
-                Data::Games => print_games(g, sort_by, |_| true, verbose),
+        Ok(g) => match &cli.filter {
+            Some(f) => print_games(
+                g,
+                &cli.sort,
+                filter_for(cli.data.clone(), f.clone()),
+                cli.verbose,
+            ),
+            None => match cli.data {
+                Data::Games => print_games(g, &cli.sort, |_| true, cli.verbose),
                 Data::Mechanics => print_properties(g, |d| d.mechanics),
                 Data::Categories => print_properties(g, |d| d.categories),
             },
@@ -147,25 +145,11 @@ fn main() {
     let cli = Cli::parse();
     let bgg = Bgg::new();
     match &cli.command {
-        Commands::Collection(args) => print_list(
-            &bgg,
-            bgg.collection(&args.user, true),
-            &args.data,
-            cli.verbose,
-            &args.filter,
-            &args.sort,
-        ),
+        Commands::Collection(args) => print_list(&cli, &bgg, bgg.collection(&args.user, true)),
         Commands::Detail(args) => match bgg.detail(args.id) {
             Err(e) => print_err(e),
             Ok(game) => print_game(game, cli.verbose),
         },
-        Commands::Search(args) => print_list(
-            &bgg,
-            bgg.search(&args.name),
-            &Data::Games,
-            cli.verbose,
-            &None,
-            &None,
-        ),
+        Commands::Search(args) => print_list(&cli, &bgg, bgg.search(&args.name)),
     }
 }
