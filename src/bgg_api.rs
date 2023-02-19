@@ -84,7 +84,7 @@ impl Bgg {
         self.details(&[id]).map(|mut details| details.remove(0))
     }
 
-    pub fn fill_details(&self, games: &mut [Game]) -> Result<(), Error> {
+    pub fn fill_details(&self, mut games: Vec<Game>) -> Result<Vec<Game>, Error> {
         let ids: Vec<u32> = games.iter().map(|g| g.id).collect();
         let mut details = HashMap::new();
         for chunk in ids.chunks(CHUNK_SIZE) {
@@ -95,7 +95,7 @@ impl Bgg {
         for g in games.iter_mut() {
             g.details = details.remove(&g.id);
         }
-        Ok(())
+        Ok(games)
     }
 
     pub fn search(&self, name: &str) -> Result<Vec<Game>, Error> {

@@ -130,17 +130,14 @@ fn print_list(
     filter: &Option<String>,
     sort_by: &Option<SortOrder>,
 ) {
-    match games {
+    match games.and_then(|g| bgg.fill_details(g)) {
         Err(e) => print_err(e),
-        Ok(mut g) => match bgg.fill_details(&mut g) {
-            Err(e) => print_err(e),
-            Ok(_) => match filter {
-                Some(f) => print_games(g, sort_by, filter_for(data.clone(), f.clone()), verbose),
-                None => match data {
-                    Data::Games => print_games(g, sort_by, |_| true, verbose),
-                    Data::Mechanics => print_properties(g, |d| d.mechanics),
-                    Data::Categories => print_properties(g, |d| d.categories),
-                },
+        Ok(g) => match filter {
+            Some(f) => print_games(g, sort_by, filter_for(data.clone(), f.clone()), verbose),
+            None => match data {
+                Data::Games => print_games(g, sort_by, |_| true, verbose),
+                Data::Mechanics => print_properties(g, |d| d.mechanics),
+                Data::Categories => print_properties(g, |d| d.categories),
             },
         },
     }
