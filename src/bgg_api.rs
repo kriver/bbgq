@@ -84,15 +84,20 @@ impl Bgg {
         self.details(&[id]).map(|mut details| details.remove(0))
     }
 
+    /// Fill in the details of the games if not present.
     pub fn fill_details(&self, mut games: Vec<Game>) -> Result<Vec<Game>, Error> {
-        let ids: Vec<u32> = games.iter().map(|g| g.id).collect();
+        let ids: Vec<u32> = games
+            .iter()
+            .filter(|g| g.details.is_none())
+            .map(|g| g.id)
+            .collect();
         let mut details = HashMap::new();
         for chunk in ids.chunks(CHUNK_SIZE) {
             for g in self.details(chunk)?.into_iter() {
                 details.insert(g.id, g.details.unwrap());
             }
         }
-        for g in games.iter_mut() {
+        for g in games.iter_mut().filter(|g| g.details.is_none()) {
             g.details = details.remove(&g.id);
         }
         Ok(games)

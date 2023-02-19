@@ -5,6 +5,7 @@ use clap::Parser;
 
 mod bgg_api;
 mod cli;
+mod cmd;
 mod constants;
 mod details;
 mod error;
@@ -12,6 +13,7 @@ mod game;
 mod xml_util;
 
 use cli::*;
+use cmd::Command;
 use details::Details;
 use error::Error;
 use game::Game;
@@ -123,6 +125,7 @@ fn print_properties(games: Vec<Game>, getter: PropertyGetter) {
 }
 
 fn print_list(cli: &Cli, bgg: &Bgg, games: Result<Vec<Game>, Error>) {
+    // TODO always fill details inside bgg_api.rs or cmd.rs?
     match games.and_then(|g| bgg.fill_details(g)) {
         Err(e) => print_err(e),
         Ok(g) => match &cli.filter {
@@ -145,11 +148,9 @@ fn main() {
     let cli = Cli::parse();
     let bgg = Bgg::new();
     match &cli.command {
-        Commands::Collection(args) => print_list(&cli, &bgg, bgg.collection(&args.user, true)),
-        Commands::Detail(args) => match bgg.detail(args.id) {
-            Err(e) => print_err(e),
-            Ok(game) => print_game(game, cli.verbose),
-        },
-        Commands::Search(args) => print_list(&cli, &bgg, bgg.search(&args.name)),
+        // TODO de-duplicate
+        Commands::Collection(cmd) => print_list(&cli, &bgg, cmd.get_games(&bgg)),
+        Commands::Detail(cmd) => print_list(&cli, &bgg, cmd.get_games(&bgg)),
+        Commands::Search(cmd) => print_list(&cli, &bgg, cmd.get_games(&bgg)),
     }
 }
