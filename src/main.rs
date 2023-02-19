@@ -65,16 +65,20 @@ fn comparator(order: &SortOrder) -> impl FnMut(&Game, &Game) -> Ordering {
     }
 }
 
+fn str_contains(haystack: &str, needle: &str) -> bool {
+    haystack.to_lowercase().contains(&needle.to_lowercase())
+}
+
 fn filter_for_property(getter: PropertyGetterRef, value: String) -> FilterType {
     Box::new(move |g: &Game| match &g.details {
         None => false,
-        Some(d) => getter(d).iter().any(|s| s.contains(&value)),
+        Some(d) => getter(d).iter().any(|s| str_contains(s, &value)),
     })
 }
 
 fn filter_for(data: Data, value: String) -> FilterType {
     match data {
-        Data::Games => Box::new(move |g: &Game| g.name.contains(&value)),
+        Data::Games => Box::new(move |g: &Game| str_contains(&g.name, &value)),
         Data::Mechanics => filter_for_property(|d| &d.mechanics, value),
         Data::Categories => filter_for_property(|d| &d.categories, value),
     }
