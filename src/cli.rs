@@ -2,6 +2,9 @@ use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
 pub struct Cli {
+    /// Display extra information when outputting game details.
+    #[arg(short, long)]
+    pub verbose: bool,
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -18,9 +21,6 @@ pub enum Commands {
         /// Selects what data to output or filter on
         #[arg(value_enum, short, long, default_value_t=Data::Games)]
         data: Data,
-        /// Display extra information when outputting game details.
-        #[arg(short, long)]
-        verbose: bool,
         /// Only output games that have matching "data"
         #[arg(short, long)]
         filter: Option<String>,
@@ -37,9 +37,6 @@ pub enum Commands {
     Search {
         /// (Partial) name of the game(s) being searched for.
         name: String,
-        /// Display extra information when outputting game details.
-        #[arg(short, long)]
-        verbose: bool,
     },
 }
 

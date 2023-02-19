@@ -84,7 +84,17 @@ fn filter_for(data: Data, value: String) -> FilterType {
     }
 }
 
-fn list_games<F>(mut games: Vec<Game>, sort_by: &Option<SortOrder>, predicate: F, verbose: bool)
+fn print_game(g: Game, verbose: bool) {
+    println!("{}", g);
+    if verbose {
+        if let Some(d) = g.details {
+            println!("  Mechanics  : {}", d.mechanics.join(", "));
+            println!("  Categories : {}", d.categories.join(", "));
+        }
+    }
+}
+
+fn print_games<F>(mut games: Vec<Game>, sort_by: &Option<SortOrder>, predicate: F, verbose: bool)
 where
     F: FnMut(&Game) -> bool,
 {
@@ -92,17 +102,11 @@ where
         games.sort_by(comparator(by))
     }
     for g in games.into_iter().filter(predicate) {
-        println!("{}", g);
-        if verbose {
-            if let Some(d) = g.details {
-                println!("  Mechanics  : {}", d.mechanics.join(", "));
-                println!("  Categories : {}", d.categories.join(", "));
-            }
-        }
+        print_game(g, verbose);
     }
 }
 
-fn list_properties(games: Vec<Game>, getter: PropertyGetter) {
+fn print_properties(games: Vec<Game>, getter: PropertyGetter) {
     let mut properties: Vec<String> = games
         .into_iter()
         .map(|g| g.details)
@@ -130,13 +134,12 @@ fn print_list(
         Err(e) => print_err(e),
         Ok(mut g) => match bgg.fill_details(&mut g) {
             Err(e) => print_err(e),
-
             Ok(_) => match filter {
-                Some(f) => list_games(g, sort_by, filter_for(data.clone(), f.clone()), verbose),
+                Some(f) => print_games(g, sort_by, filter_for(data.clone(), f.clone()), verbose),
                 None => match data {
-                    Data::Games => list_games(g, sort_by, |_| true, verbose),
-                    Data::Mechanics => list_properties(g, |d| d.mechanics),
-                    Data::Categories => list_properties(g, |d| d.categories),
+                    Data::Games => print_games(g, sort_by, |_| true, verbose),
+                    Data::Mechanics => print_properties(g, |d| d.mechanics),
+                    Data::Categories => print_properties(g, |d| d.categories),
                 },
             },
         },
@@ -150,23 +153,27 @@ fn main() {
         Commands::Collection {
             user,
             data,
-            verbose,
             filter,
             sort,
         } => print_list(
             &bgg,
             bgg.collection(user, true),
             data,
-            *verbose,
+            cli.verbose,
             filter,
             sort,
         ),
         Commands::Detail { id } => match bgg.detail(*id) {
             Err(e) => print_err(e),
-            Ok(game) => println!("{}", game),
+            Ok(game) => print_game(game, cli.verbose),
         },
-        Commands::Search { name, verbose } => {
-            print_list(&bgg, bgg.search(name), &Data::Games, *verbose, &None, &None)
-        }
+        Commands::Search { name } => print_list(
+            &bgg,
+            bgg.search(name),
+            &Data::Games,
+            cli.verbose,
+            &None,
+            &None,
+        ),
     }
 }
