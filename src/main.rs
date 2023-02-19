@@ -84,7 +84,7 @@ fn filter_for(data: Data, value: String) -> FilterType {
     }
 }
 
-fn list_games<F>(mut games: Vec<Game>, sort_by: &Option<SortOrder>, predicate: F)
+fn list_games<F>(mut games: Vec<Game>, sort_by: &Option<SortOrder>, predicate: F, verbose: bool)
 where
     F: FnMut(&Game) -> bool,
 {
@@ -92,7 +92,13 @@ where
         games.sort_by(comparator(by))
     }
     for g in games.into_iter().filter(predicate) {
-        println!("{}", g)
+        println!("{}", g);
+        if verbose {
+            if let Some(d) = g.details {
+                println!("  Mechanics  : {}", d.mechanics.join(", "));
+                println!("  Categories : {}", d.categories.join(", "));
+            }
+        }
     }
 }
 
@@ -115,13 +121,14 @@ fn list_properties(games: Vec<Game>, getter: PropertyGetter) {
 fn list_collection(
     games: Vec<Game>,
     data: &Data,
+    verbose: bool,
     filter: &Option<String>,
     sort_by: &Option<SortOrder>,
 ) {
     match filter {
-        Some(f) => list_games(games, sort_by, filter_for(data.clone(), f.clone())),
+        Some(f) => list_games(games, sort_by, filter_for(data.clone(), f.clone()), verbose),
         None => match data {
-            Data::Games => list_games(games, sort_by, |_| true),
+            Data::Games => list_games(games, sort_by, |_| true, verbose),
             Data::Mechanics => list_properties(games, |d| d.mechanics),
             Data::Categories => list_properties(games, |d| d.categories),
         },
@@ -135,13 +142,14 @@ fn main() {
         Commands::Collection {
             user,
             data,
+            verbose,
             filter,
             sort,
         } => match bgg.collection(user, true) {
             Err(e) => print_err(e),
             Ok(mut games) => match bgg.fill_details(&mut games) {
                 Err(e) => print_err(e),
-                Ok(_) => list_collection(games, data, filter, sort),
+                Ok(_) => list_collection(games, data, *verbose, filter, sort),
             },
         },
         Commands::Detail { id } => match bgg.detail(*id) {
@@ -150,7 +158,7 @@ fn main() {
         },
         Commands::Search { name } => match bgg.search(name) {
             Err(e) => print_err(e),
-            Ok(results) => list_collection(results, &Data::Games, &None, &None),
+            Ok(results) => list_collection(results, &Data::Games, false, &None, &None),
         },
     }
 }
