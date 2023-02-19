@@ -21,7 +21,7 @@ type PropertyGetterRef = fn(&Details) -> &[String];
 type FilterType = Box<dyn FnMut(&Game) -> bool>;
 
 fn print_err(e: Error) {
-    println!("{}", e);
+    eprintln!("{}", e);
 }
 
 // partial because of f32
@@ -147,26 +147,21 @@ fn main() {
     let cli = Cli::parse();
     let bgg = Bgg::new();
     match &cli.command {
-        Commands::Collection {
-            user,
-            data,
-            filter,
-            sort,
-        } => print_list(
+        Commands::Collection(args) => print_list(
             &bgg,
-            bgg.collection(user, true),
-            data,
+            bgg.collection(&args.user, true),
+            &args.data,
             cli.verbose,
-            filter,
-            sort,
+            &args.filter,
+            &args.sort,
         ),
-        Commands::Detail { id } => match bgg.detail(*id) {
+        Commands::Detail(args) => match bgg.detail(args.id) {
             Err(e) => print_err(e),
             Ok(game) => print_game(game, cli.verbose),
         },
-        Commands::Search { name } => print_list(
+        Commands::Search(args) => print_list(
             &bgg,
-            bgg.search(name),
+            bgg.search(&args.name),
             &Data::Games,
             cli.verbose,
             &None,
