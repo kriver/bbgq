@@ -17,5 +17,4 @@ Functionalities:
 
 # Possible future improvements
 
-* add details to games in "search"
 * Throttling to avoid 429 (too many requests)

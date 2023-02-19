@@ -118,19 +118,27 @@ fn list_properties(games: Vec<Game>, getter: PropertyGetter) {
     }
 }
 
-fn list_collection(
-    games: Vec<Game>,
+fn print_list(
+    bgg: &Bgg,
+    games: Result<Vec<Game>, Error>,
     data: &Data,
     verbose: bool,
     filter: &Option<String>,
     sort_by: &Option<SortOrder>,
 ) {
-    match filter {
-        Some(f) => list_games(games, sort_by, filter_for(data.clone(), f.clone()), verbose),
-        None => match data {
-            Data::Games => list_games(games, sort_by, |_| true, verbose),
-            Data::Mechanics => list_properties(games, |d| d.mechanics),
-            Data::Categories => list_properties(games, |d| d.categories),
+    match games {
+        Err(e) => print_err(e),
+        Ok(mut g) => match bgg.fill_details(&mut g) {
+            Err(e) => print_err(e),
+
+            Ok(_) => match filter {
+                Some(f) => list_games(g, sort_by, filter_for(data.clone(), f.clone()), verbose),
+                None => match data {
+                    Data::Games => list_games(g, sort_by, |_| true, verbose),
+                    Data::Mechanics => list_properties(g, |d| d.mechanics),
+                    Data::Categories => list_properties(g, |d| d.categories),
+                },
+            },
         },
     }
 }
@@ -145,20 +153,20 @@ fn main() {
             verbose,
             filter,
             sort,
-        } => match bgg.collection(user, true) {
-            Err(e) => print_err(e),
-            Ok(mut games) => match bgg.fill_details(&mut games) {
-                Err(e) => print_err(e),
-                Ok(_) => list_collection(games, data, *verbose, filter, sort),
-            },
-        },
+        } => print_list(
+            &bgg,
+            bgg.collection(user, true),
+            data,
+            *verbose,
+            filter,
+            sort,
+        ),
         Commands::Detail { id } => match bgg.detail(*id) {
             Err(e) => print_err(e),
             Ok(game) => println!("{}", game),
         },
-        Commands::Search { name } => match bgg.search(name) {
-            Err(e) => print_err(e),
-            Ok(results) => list_collection(results, &Data::Games, false, &None, &None),
-        },
+        Commands::Search { name, verbose } => {
+            print_list(&bgg, bgg.search(name), &Data::Games, *verbose, &None, &None)
+        }
     }
 }

@@ -37,6 +37,9 @@ pub enum Commands {
     Search {
         /// (Partial) name of the game(s) being searched for.
         name: String,
+        /// Display extra information when outputting game details.
+        #[arg(short, long)]
+        verbose: bool,
     },
 }
 
